@@ -4,7 +4,7 @@ https://huggingface.co/datasets/HuggingFaceTB/smol-smoltalk
 We use the "smol" version, which is more appropriate for smaller models.
 """
 
-from modelscope.msdatasets import MsDataset
+from datasets import load_dataset
 from tasks.common import Task
 
 class SmolTalk(Task):
@@ -13,7 +13,7 @@ class SmolTalk(Task):
     def __init__(self, split, **kwargs):
         super().__init__(**kwargs)
         assert split in ["train", "test"], "SmolTalk split must be train|test"
-        self.ds = MsDataset.load("HuggingFaceTB/smol-smoltalk", split=split).shuffle(seed=42)
+        self.ds = load_dataset("HuggingFaceTB/smol-smoltalk", split=split).shuffle(seed=42)
         self.length = len(self.ds)
 
     def num_examples(self):
