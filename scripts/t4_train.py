@@ -238,8 +238,8 @@ for step in range(num_iterations + 1):
 
     # save checkpoint at the end of the run (only on master process)
     if master_process and last_step:
-        output_dirname = model_tag if model_tag else f"t4_d{depth}"
-        checkpoint_dir = os.path.join(base_dir, "t4_checkpoints", output_dirname)
+        output_dirname = model_tag if model_tag else f"d{depth}"
+        checkpoint_dir = os.path.join(base_dir, "base_checkpoints", output_dirname)
         save_checkpoint(
             checkpoint_dir,
             step,

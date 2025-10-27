@@ -209,8 +209,8 @@ while True:
 
     # save checkpoint at the end of the run (only on master process)
     if master_process and last_step and not dry_run:
-        output_dirname = f"t4_d{depth}"
-        checkpoint_dir = os.path.join(base_dir, "t4_mid_checkpoints", output_dirname)
+        output_dirname = f"d{depth}"
+        checkpoint_dir = os.path.join(base_dir, "mid_checkpoints", output_dirname)
         save_checkpoint(
             checkpoint_dir,
             step,

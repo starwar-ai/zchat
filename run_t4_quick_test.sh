@@ -13,7 +13,11 @@ export NANOCHAT_BASE_DIR=".cache/nanochat"
 mkdir -p $NANOCHAT_BASE_DIR
 
 # 检查并安装uv
-command -v uv &> /dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
+# 检测下是否安装了uv
+if ! command -v uv &> /dev/null; then
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+fi
+
 
 # 设置虚拟环境
 [ -d ".venv" ] || uv venv
@@ -30,22 +34,36 @@ echo "📊 Wandb运行名称: $WANDB_RUN"
 python -m nanochat.report reset
 
 # 安装Rust和编译tokenizer
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+if ! command -v rustc &> /dev/null; then
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+fi
+
 source "$HOME/.cargo/env"
 uv run maturin develop --release --manifest-path rustbpe/Cargo.toml
 
 # 下载评估数据
 EVAL_BUNDLE_URL=https://karpathy-public.s3.us-west-2.amazonaws.com/eval_bundle.zip
 if [ ! -d "$NANOCHAT_BASE_DIR/eval_bundle" ]; then
-    echo "📥 下载评估数据包..."
-    curl -L -o eval_bundle.zip $EVAL_BUNDLE_URL
+    if [ ! -f "eval_bundle.zip" ]; then
+        echo "📥 下载评估数据包..."
+        curl -L -o eval_bundle.zip $EVAL_BUNDLE_URL
+    else
+        echo "🗂️ 已存在 eval_bundle.zip，跳过下载。"
+    fi
     unzip -q eval_bundle.zip
     rm eval_bundle.zip
     mv eval_bundle $NANOCHAT_BASE_DIR
+else
+    echo "✅ 评估数据包已经存在，跳过下载。"
 fi
 
 # 下载身份对话数据
-curl -L -o $NANOCHAT_BASE_DIR/identity_conversations.jsonl https://karpathy-public.s3.us-west-2.amazonaws.com/identity_conversations.jsonl
+if [ ! -f "$NANOCHAT_BASE_DIR/identity_conversations.jsonl" ]; then
+    curl -L -o $NANOCHAT_BASE_DIR/identity_conversations.jsonl https://karpathy-public.s3.us-west-2.amazonaws.com/identity_conversations.jsonl
+else
+    echo "✅ identity_conversations.jsonl 已存在，跳过下载。"
+fi
 
 echo "📊 开始数据准备..."
 
