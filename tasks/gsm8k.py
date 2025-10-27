@@ -15,6 +15,7 @@ Notice that GSM8K uses tool calls inside << >> tags.
 """
 
 import re
+import torch.distributed as dist
 from datasets import load_dataset
 from tasks.common import Task
 
@@ -40,7 +41,19 @@ class GSM8K(Task):
         super().__init__(**kwargs)
         assert subset in ["main", "socratic"], "GSM8K subset must be main|socratic"
         assert split in ["train", "test"], "GSM8K split must be train|test"
-        self.ds = load_dataset("openai/gsm8k", subset, split=split).shuffle(seed=42)
+
+        # In distributed training, let rank 0 download first to avoid connection issues
+        if dist.is_initialized():
+            if dist.get_rank() == 0:
+                # Master process downloads the dataset
+                self.ds = load_dataset("openai/gsm8k", subset, split=split).shuffle(seed=42)
+            dist.barrier()  # Wait for rank 0 to finish downloading
+            if dist.get_rank() != 0:
+                # Other ranks load from cache
+                self.ds = load_dataset("openai/gsm8k", subset, split=split).shuffle(seed=42)
+        else:
+            # Non-distributed training
+            self.ds = load_dataset("openai/gsm8k", subset, split=split).shuffle(seed=42)
 
     @property
     def eval_type(self):

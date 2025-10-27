@@ -4,6 +4,8 @@ https://huggingface.co/datasets/HuggingFaceTB/smol-smoltalk
 We use the "smol" version, which is more appropriate for smaller models.
 """
 
+import os
+import torch.distributed as dist
 from datasets import load_dataset
 from tasks.common import Task
 
@@ -13,7 +15,20 @@ class SmolTalk(Task):
     def __init__(self, split, **kwargs):
         super().__init__(**kwargs)
         assert split in ["train", "test"], "SmolTalk split must be train|test"
-        self.ds = load_dataset("HuggingFaceTB/smol-smoltalk", split=split).shuffle(seed=42)
+
+        # In distributed training, let rank 0 download first to avoid connection issues
+        if dist.is_initialized():
+            if dist.get_rank() == 0:
+                # Master process downloads the dataset
+                self.ds = load_dataset("HuggingFaceTB/smol-smoltalk", split=split).shuffle(seed=42)
+            dist.barrier()  # Wait for rank 0 to finish downloading
+            if dist.get_rank() != 0:
+                # Other ranks load from cache
+                self.ds = load_dataset("HuggingFaceTB/smol-smoltalk", split=split).shuffle(seed=42)
+        else:
+            # Non-distributed training
+            self.ds = load_dataset("HuggingFaceTB/smol-smoltalk", split=split).shuffle(seed=42)
+
         self.length = len(self.ds)
 
     def num_examples(self):

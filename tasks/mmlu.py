@@ -3,6 +3,7 @@ The MMLU dataset.
 https://huggingface.co/datasets/cais/mmlu
 """
 
+import torch.distributed as dist
 from datasets import load_dataset
 from tasks.common import Task, render_mc
 
@@ -19,7 +20,20 @@ class MMLU(Task):
             assert split == "train", "auxiliary_train must be split into train"
         self.subset = subset
         self.split = split
-        self.ds = load_dataset("cais/mmlu", subset, split=split).shuffle(seed=42)
+
+        # In distributed training, let rank 0 download first to avoid connection issues
+        if dist.is_initialized():
+            if dist.get_rank() == 0:
+                # Master process downloads the dataset
+                self.ds = load_dataset("cais/mmlu", subset, split=split).shuffle(seed=42)
+            dist.barrier()  # Wait for rank 0 to finish downloading
+            if dist.get_rank() != 0:
+                # Other ranks load from cache
+                self.ds = load_dataset("cais/mmlu", subset, split=split).shuffle(seed=42)
+        else:
+            # Non-distributed training
+            self.ds = load_dataset("cais/mmlu", subset, split=split).shuffle(seed=42)
+
         if subset == "auxiliary_train":
             # I don't understand why but the auxiliary_train rows have some weird additional 'train' wrapper
             self.ds = self.ds.map(lambda row: row['train'], remove_columns=['train'])
