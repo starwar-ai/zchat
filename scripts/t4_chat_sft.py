@@ -41,6 +41,7 @@ step = None # step to load the model from
 device_type = "" # cuda|cpu|mps (empty => autodetect)
 dtype = "bfloat16"
 device_batch_size = 1 # 进一步减少批次大小以适应SFT的更大模型
+use_gradient_checkpointing = True # 启用梯度检查点以节省显存
 # optimization
 num_epochs = 1
 num_iterations = -1 # override number of iterations (-1 = disable, use num_epochs to derive it)
@@ -74,6 +75,10 @@ wandb_run = DummyWandb() if use_dummy_wandb else wandb.init(project="nanochat-t4
 
 # Load the model and tokenizer
 model, tokenizer, meta = load_model(source, device, phase="train", model_tag=model_tag, step=step)
+# Enable gradient checkpointing for memory efficiency
+if use_gradient_checkpointing:
+    model.gradient_checkpointing = True
+    print0("✓ Gradient checkpointing enabled for memory efficiency")
 orig_model = model # original, uncompiled model
 # model = torch.compile(model, dynamic=True) # doesn't work super well because of variable lengths of inputs
 engine = Engine(model, tokenizer) # will be used for inline model evaluation only
@@ -239,6 +244,10 @@ for step in range(num_iterations):
     for opt in optimizers:
         opt.step()
     model.zero_grad(set_to_none=True)
+
+    # Periodic CUDA cache clearing to prevent memory fragmentation
+    if step % 10 == 0 and device_type == "cuda":
+        torch.cuda.empty_cache()
 
     # logging
     train_loss_item = train_loss.item()

@@ -153,6 +153,8 @@ class GPT(nn.Module):
         cos, sin = self._precompute_rotary_embeddings(self.rotary_seq_len, head_dim)
         self.register_buffer("cos", cos, persistent=False) # persistent=False means it's not saved to the checkpoint
         self.register_buffer("sin", sin, persistent=False)
+        # Gradient checkpointing flag for memory efficiency
+        self.gradient_checkpointing = False
 
     def init_weights(self):
         self.apply(self._init_weights)
@@ -256,7 +258,11 @@ class GPT(nn.Module):
         x = self.transformer.wte(idx)
         x = norm(x)
         for block in self.transformer.h:
-            x = block(x, cos_sin, kv_cache)
+            # Use gradient checkpointing during training to save memory
+            if self.gradient_checkpointing and self.training and targets is not None:
+                x = torch.utils.checkpoint.checkpoint(block, x, cos_sin, kv_cache, use_reentrant=False)
+            else:
+                x = block(x, cos_sin, kv_cache)
         x = norm(x)
 
         # Forward the lm_head (compute logits)
