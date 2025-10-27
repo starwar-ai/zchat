@@ -17,8 +17,9 @@ from nanochat.loss_eval import evaluate_bpb
 from nanochat.engine import Engine
 
 # Configuration
-device_batch_size = 32
+device_batch_size = 8  # Batch size for data loading (processed in micro-batches to avoid OOM)
 split_tokens = 20*524288  # number of tokens to evaluate per split
+microbatch_size = 1  # Process 1 sample at a time to avoid OOM during loss calculation
 model_tag = None # optional model tag for the output directory name
 model_step = None # optional model step for the output directory name
 device_type = "" # cuda|cpu|mps (empty => autodetect)
@@ -40,7 +41,7 @@ bpb_results = {}
 for split_name in ["train", "val"]:
     loader = tokenizing_distributed_data_loader(device_batch_size, sequence_len, split_name, device=device)
     with autocast_ctx:
-        bpb = evaluate_bpb(model, loader, steps, token_bytes)
+        bpb = evaluate_bpb(model, loader, steps, token_bytes, microbatch_size=microbatch_size)
     print0(f"{split_name} bpb: {bpb:.4f}")
     bpb_results[split_name] = bpb
 

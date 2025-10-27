@@ -6,7 +6,7 @@ import torch
 import torch.distributed as dist
 
 @torch.no_grad()
-def evaluate_bpb(model, batches, steps, token_bytes):
+def evaluate_bpb(model, batches, steps, token_bytes, microbatch_size=1):
     """
     Instead of the naive 'mean loss', this function returns the bits per byte (bpb),
     which is a tokenization vocab size-indepedent metric, meaning you are still comparing
@@ -23,6 +23,9 @@ def evaluate_bpb(model, batches, steps, token_bytes):
     In addition to evaluate_loss, we need the token_bytes tensor:
     It is a 1D tensor of shape (vocab_size,), indicating the number of bytes for
     each token id, or 0 if the token is to not be counted (e.g. special tokens).
+
+    Args:
+        microbatch_size: Process each batch in micro-batches to avoid OOM with large batches
     """
     # record the losses
     total_nats = torch.tensor(0.0, dtype=torch.float32, device=model.get_device())
@@ -30,27 +33,36 @@ def evaluate_bpb(model, batches, steps, token_bytes):
     batch_iter = iter(batches)
     for _ in range(steps):
         x, y = next(batch_iter)
-        loss2d = model(x, y, loss_reduction='none') # (B, T)
-        loss2d = loss2d.view(-1) # flatten
-        y = y.view(-1) # flatten
-        if (y.int() < 0).any(): # mps does not currently have kernel for < 0 for int64, only int32
-            # slightly more complex code path if some target tokens are ignore_index (e.g. -1)
-            # any target token < 0 is to be ignored: do NOT index token_bytes with negatives
-            valid = y >= 0
-            y_safe = torch.where(valid, y, torch.zeros_like(y))
-            # map valid targets to their byte length; ignored targets contribute 0 bytes
-            num_bytes2d = torch.where(
-                valid,
-                token_bytes[y_safe],
-                torch.zeros_like(y, dtype=token_bytes.dtype)
-            )
-            total_nats += (loss2d * (num_bytes2d > 0)).sum()
-            total_bytes += num_bytes2d.sum()
-        else:
-            # fast path: no ignored targets, safe to index directly
-            num_bytes2d = token_bytes[y]
-            total_nats += (loss2d * (num_bytes2d > 0)).sum()
-            total_bytes += num_bytes2d.sum()
+        batch_size = x.size(0)
+
+        # Process in micro-batches to avoid OOM when computing unreduced loss
+        for i in range(0, batch_size, microbatch_size):
+            end_i = min(i + microbatch_size, batch_size)
+            x_micro = x[i:end_i]
+            y_micro = y[i:end_i]
+
+            loss2d = model(x_micro, y_micro, loss_reduction='none') # (microbatch_size, T)
+            loss2d = loss2d.view(-1) # flatten
+            y_micro_flat = y_micro.view(-1) # flatten
+
+            if (y_micro_flat.int() < 0).any(): # mps does not currently have kernel for < 0 for int64, only int32
+                # slightly more complex code path if some target tokens are ignore_index (e.g. -1)
+                # any target token < 0 is to be ignored: do NOT index token_bytes with negatives
+                valid = y_micro_flat >= 0
+                y_safe = torch.where(valid, y_micro_flat, torch.zeros_like(y_micro_flat))
+                # map valid targets to their byte length; ignored targets contribute 0 bytes
+                num_bytes2d = torch.where(
+                    valid,
+                    token_bytes[y_safe],
+                    torch.zeros_like(y_micro_flat, dtype=token_bytes.dtype)
+                )
+                total_nats += (loss2d * (num_bytes2d > 0)).sum()
+                total_bytes += num_bytes2d.sum()
+            else:
+                # fast path: no ignored targets, safe to index directly
+                num_bytes2d = token_bytes[y_micro_flat]
+                total_nats += (loss2d * (num_bytes2d > 0)).sum()
+                total_bytes += num_bytes2d.sum()
     # sum reduce across all ranks
     world_size = dist.get_world_size() if dist.is_initialized() else 1
     if world_size > 1:
