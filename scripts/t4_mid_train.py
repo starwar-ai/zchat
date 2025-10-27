@@ -32,7 +32,7 @@ from tasks.spellingbee import SimpleSpelling, SpellingBee
 
 # -----------------------------------------------------------------------------
 # T4 GPU优化配置
-run = "t4_midtraining" # wandb run name
+run = "midtraining" # wandb run name
 device_type = "" # cuda|cpu|mps (empty => autodetect)
 model_tag = None # model tag to load the model from (base model or midtrained model)
 step = None # step to load the model from (base model or midtrained model)

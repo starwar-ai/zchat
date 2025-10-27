@@ -57,7 +57,7 @@ core_metric_every = 1000 # 更频繁的核心指标评估 (原来2000)
 core_metric_max_per_task = 250 # 减少每个任务的最大样本数 (原来500)
 sample_every = 1000 # 更频繁的采样 (原来2000)
 # Output
-model_tag = "t4_d12" # T4训练的模型标签
+model_tag = "d12" # T4训练的模型标签
 # now allow CLI to override the settings via the configurator
 config_keys = [k for k,v in globals().items() if not k.startswith('_') and isinstance(v, (int, float, bool, str))]
 exec(open(os.path.join('nanochat', 'configurator.py')).read()) # overrides from command line or config file

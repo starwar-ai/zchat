@@ -32,7 +32,7 @@ from tasks.spellingbee import SimpleSpelling, SpellingBee
 
 # -----------------------------------------------------------------------------
 # T4 GPU优化的SFT配置
-run = "t4_sft" # wandb run name
+run = "sft" # wandb run name
 # input model options
 source = "mid" # base|mid , which checkpoint to load the model from
 model_tag = None # model tag to load the model from

@@ -152,9 +152,9 @@ nvidia-smi
 ## 输出文件
 
 训练完成后，模型检查点将保存在：
-- 基础模型: `~/.cache/nanochat/t4_checkpoints/`
-- 中期模型: `~/.cache/nanochat/t4_mid_checkpoints/`
-- SFT模型: `~/.cache/nanochat/t4_chatsft_checkpoints/`
+- 基础模型: `~/.cache/nanochat/checkpoints/`
+- 中期模型: `~/.cache/nanochat/mid_checkpoints/`
+- SFT模型: `~/.cache/nanochat/chatsft_checkpoints/`
 
 ## 注意事项
 
