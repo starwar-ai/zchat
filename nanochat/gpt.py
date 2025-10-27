@@ -278,7 +278,11 @@ class GPT(nn.Module):
         else:
             # inference mode: compute and return the logits
             logits = self.lm_head(x)
-            logits = softcap * torch.tanh(logits / softcap) # logits softcap
+            # Apply softcap in-place to reduce memory usage
+            # Split into two operations to avoid creating large intermediate tensors
+            logits.div_(softcap)
+            logits = torch.tanh(logits)
+            logits.mul_(softcap)
             return logits
 
     @torch.inference_mode()

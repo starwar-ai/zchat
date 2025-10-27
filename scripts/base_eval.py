@@ -20,6 +20,9 @@ from contextlib import nullcontext
 import pandas as pd
 import torch
 
+# Configure PyTorch memory allocator to reduce fragmentation
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
+
 from nanochat.common import compute_init, compute_cleanup, print0, get_base_dir, autodetect_device_type
 from nanochat.tokenizer import HuggingFaceTokenizer
 from nanochat.checkpoint_manager import load_model

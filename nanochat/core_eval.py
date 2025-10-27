@@ -142,26 +142,62 @@ def batch_sequences_lm(tokenizer, prompts):
 
 
 @torch.no_grad()
-def forward_model(model, input_ids):
+def forward_model(model, input_ids, microbatch_size=1):
     """
     Take BxT tensor of token ids, return BxT tensor of losses and argmax predictions.
     The last column of losses is set to nan because we don't have autoregressive targets there.
+
+    Args:
+        model: The model to forward
+        input_ids: Input token IDs of shape [batch_size, seq_len]
+        microbatch_size: Process the batch in chunks of this size to reduce memory usage
     """
     batch_size, seq_len = input_ids.size()
-    outputs = model(input_ids)
-    # Roll the tensor to the left by one position to get the (autoregressive) target ids
-    target_ids = torch.roll(input_ids, shifts=-1, dims=1)
-    # Calculate cross entropy at all positions
-    losses = torch.nn.functional.cross_entropy(
-        outputs.view(batch_size * seq_len, -1),
-        target_ids.view(batch_size * seq_len),
-        reduction='none'
-    ).view(batch_size, seq_len)
-    # Set the last column to be nan because there is no autoregressive loss there
-    losses[:, -1] = float('nan')
-    # Get the argmax predictions at each position
-    predictions = outputs.argmax(dim=-1)
-    return losses, predictions
+    device = input_ids.device
+
+    # Pre-allocate output tensors
+    all_losses = torch.zeros(batch_size, seq_len, device=device)
+    all_predictions = torch.zeros(batch_size, seq_len, dtype=torch.long, device=device)
+
+    # Process in micro-batches to reduce peak memory usage
+    for i in range(0, batch_size, microbatch_size):
+        end_idx = min(i + microbatch_size, batch_size)
+        micro_input_ids = input_ids[i:end_idx]
+
+        # Clear cache before forward pass to reduce fragmentation
+        if device.type == 'cuda':
+            torch.cuda.empty_cache()
+
+        # Forward pass
+        outputs = model(micro_input_ids)
+
+        # Roll the tensor to the left by one position to get the (autoregressive) target ids
+        target_ids = torch.roll(micro_input_ids, shifts=-1, dims=1)
+
+        # Calculate cross entropy at all positions
+        micro_batch_size = end_idx - i
+        micro_losses = torch.nn.functional.cross_entropy(
+            outputs.view(micro_batch_size * seq_len, -1),
+            target_ids.view(micro_batch_size * seq_len),
+            reduction='none'
+        ).view(micro_batch_size, seq_len)
+
+        # Set the last column to be nan because there is no autoregressive loss there
+        micro_losses[:, -1] = float('nan')
+
+        # Get the argmax predictions at each position
+        micro_predictions = outputs.argmax(dim=-1)
+
+        # Store results
+        all_losses[i:end_idx] = micro_losses
+        all_predictions[i:end_idx] = micro_predictions
+
+        # Clear intermediate tensors
+        del outputs, target_ids, micro_losses, micro_predictions
+        if device.type == 'cuda':
+            torch.cuda.empty_cache()
+
+    return all_losses, all_predictions
 
 
 @torch.no_grad()
