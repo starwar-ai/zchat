@@ -40,8 +40,9 @@ num_iterations = -1 # explicit number of steps of the optimization (-1 = disable
 target_flops = -1.0 # calculate num_iterations to reach target_flops
 target_param_data_ratio = 20 # calculate num_iterations to maintain fixed data:param ratio (Chinchilla=20)
 # Optimization - 针对T4优化
-device_batch_size = 4 # 大幅减少批次大小以适应T4的16GB显存 (原来32)
+device_batch_size = 2 # 进一步减少批次大小以适应T4显存限制 (原来4, 默认32)
 total_batch_size = 131072 # 减少总批次大小 (原来524288)
+use_gradient_checkpointing = True # 启用梯度检查点以节省显存
 embedding_lr = 0.2
 unembedding_lr = 0.004
 weight_decay = 0.0
@@ -114,6 +115,10 @@ with torch.device("meta"):
     model = GPT(model_config)
 model.to_empty(device=device)
 model.init_weights()
+# Enable gradient checkpointing for memory efficiency
+if use_gradient_checkpointing:
+    model.gradient_checkpointing = True
+    print0("✓ Gradient checkpointing enabled for memory efficiency")
 orig_model = model # original, uncompiled model, for saving raw model state_dict
 model = torch.compile(model, dynamic=False)
 num_params = sum(p.numel() for p in model.parameters())
@@ -286,6 +291,11 @@ for step in range(num_iterations + 1):
     for opt in optimizers:
         opt.step()
     model.zero_grad(set_to_none=True)
+
+    # Periodic CUDA cache clearing to prevent memory fragmentation
+    if step % 10 == 0 and device_type == "cuda":
+        torch.cuda.empty_cache()
+
     synchronize()
     t1 = time.time()
     dt = t1 - t0

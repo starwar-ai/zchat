@@ -40,6 +40,7 @@ dtype = "bfloat16"
 num_iterations = -1 # explicit number of steps of the optimization (-1 = disable)
 max_seq_len = 1024 # 减少序列长度以节省显存
 device_batch_size = 2 # 进一步减少批次大小以适应midtrain的更大模型
+use_gradient_checkpointing = True # 启用梯度检查点以节省显存
 unembedding_lr = 0.004
 embedding_lr = 0.2
 matrix_lr = 0.02
@@ -71,6 +72,10 @@ model, tokenizer, meta = load_model("base", device, phase="train", model_tag=mod
 pretrain_batch_size = meta.get("device_batch_size", None)
 if pretrain_batch_size is not None and device_batch_size > pretrain_batch_size:
     print0(f"FOOTGUN WARNING: base model training used device_batch_size {pretrain_batch_size}, did you pass in a good --device_batch_size to this script?")
+# Enable gradient checkpointing for memory efficiency
+if use_gradient_checkpointing:
+    model.gradient_checkpointing = True
+    print0("✓ Gradient checkpointing enabled for memory efficiency")
 orig_model = model
 model = torch.compile(model, dynamic=False)
 depth = model.config.n_layer
@@ -259,6 +264,11 @@ while True:
     for opt in optimizers:
         opt.step()
     model.zero_grad(set_to_none=True)
+
+    # Periodic CUDA cache clearing to prevent memory fragmentation
+    if step % 10 == 0 and device_type == "cuda":
+        torch.cuda.empty_cache()
+
     synchronize()
     t1 = time.time()
     dt = t1 - t0
