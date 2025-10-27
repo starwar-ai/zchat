@@ -3,7 +3,7 @@ The ARC dataset from Allen AI.
 https://huggingface.co/datasets/allenai/ai2_arc
 """
 
-from modelscope.msdatasets import MsDataset
+from datasets import load_dataset
 from tasks.common import Task, render_mc
 
 class ARC(Task):
@@ -12,7 +12,7 @@ class ARC(Task):
         super().__init__(**kwargs)
         assert subset in ["ARC-Easy", "ARC-Challenge"], "ARC subset must be ARC-Easy or ARC-Challenge"
         assert split in ["train", "validation", "test"], "ARC split must be train|validation|test"
-        self.ds = MsDataset.load("allenai/ai2_arc", subset_name=subset, split=split).shuffle(seed=42)
+        self.ds = load_dataset("allenai/ai2_arc", name=subset, split=split).shuffle(seed=42)
 
     @property
     def eval_type(self):
