@@ -9,7 +9,7 @@ echo "🧪 开始T4 GPU快速测试..."
 
 # 环境设置
 export OMP_NUM_THREADS=1
-export NANOCHAT_BASE_DIR="$HOME/.cache/nanochat"
+export NANOCHAT_BASE_DIR=".cache/nanochat"
 mkdir -p $NANOCHAT_BASE_DIR
 
 # 检查并安装uv
