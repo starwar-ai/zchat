@@ -15,7 +15,8 @@ Notice that GSM8K uses tool calls inside << >> tags.
 """
 
 import re
-from datasets import load_dataset
+from pathlib import Path
+from datasets import load_dataset, Dataset
 from tasks.common import Task
 
 
@@ -36,11 +37,22 @@ def extract_answer(completion):
 
 class GSM8K(Task):
 
-    def __init__(self, subset, split, **kwargs):
+    def __init__(self, subset, split, data_dir=None, **kwargs):
         super().__init__(**kwargs)
         assert subset in ["main", "socratic"], "GSM8K subset must be main|socratic"
         assert split in ["train", "test"], "GSM8K split must be train|test"
-        self.ds = load_dataset("openai/gsm8k", name=subset, split=split).shuffle(seed=42)
+
+        if data_dir is not None:
+            # Load from local parquet file
+            data_path = Path(data_dir) / "gsm8k" / f"{subset}_{split}.parquet"
+            if not data_path.exists():
+                raise FileNotFoundError(f"Local dataset not found: {data_path}. Please run scripts/download_datasets.py first.")
+            self.ds = Dataset.from_parquet(str(data_path))
+        else:
+            # Load from HuggingFace
+            self.ds = load_dataset("openai/gsm8k", name=subset, split=split)
+
+        self.ds = self.ds.shuffle(seed=42)
 
     @property
     def eval_type(self):

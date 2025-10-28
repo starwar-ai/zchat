@@ -14,6 +14,7 @@ dependencies = [
     "setuptools>=80.9.0",
     "tiktoken>=0.11.0",
     "tokenizers>=0.22.0",
+    "toml>=0.10.2",
     "torch>=2.8.0",
     "uvicorn>=0.36.0",
     "wandb>=0.21.3",
@@ -69,10 +70,13 @@ gpu = [
     "torch>=2.8.0",  
 ]  
   
-[tool.uv]  
-conflicts = [  
-    [  
-        { extra = "cpu" },  
-        { extra = "gpu" },  
-    ],  
-]  
+[tool.uv]
+conflicts = [
+    [
+        { extra = "cpu" },
+        { extra = "gpu" },
+    ],
+]
+
+[tool.nanochat]
+nanochat_base_dir = "~/.cache/nanochat"  

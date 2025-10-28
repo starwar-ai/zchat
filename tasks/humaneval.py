@@ -5,7 +5,8 @@ It is a coding benchmark.
 """
 
 import re
-from datasets import load_dataset
+from pathlib import Path
+from datasets import load_dataset, Dataset
 from nanochat.execution import execute_code
 from tasks.common import Task
 
@@ -46,9 +47,20 @@ def extract_program(completion):
 
 class HumanEval(Task):
 
-    def __init__(self, **kwargs):
+    def __init__(self, data_dir=None, **kwargs):
         super().__init__(**kwargs)
-        self.ds = load_dataset("openai/openai_humaneval", split="test").shuffle(seed=42)
+
+        if data_dir is not None:
+            # Load from local parquet file
+            data_path = Path(data_dir) / "humaneval" / "test.parquet"
+            if not data_path.exists():
+                raise FileNotFoundError(f"Local dataset not found: {data_path}. Please run scripts/download_datasets.py first.")
+            self.ds = Dataset.from_parquet(str(data_path))
+        else:
+            # Load from HuggingFace
+            self.ds = load_dataset("openai/openai_humaneval", split="test")
+
+        self.ds = self.ds.shuffle(seed=42)
 
     @property
     def eval_type(self):

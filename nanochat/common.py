@@ -7,6 +7,7 @@ import re
 import logging
 import fcntl
 import urllib.request
+import json
 import torch
 import torch.distributed as dist
 
@@ -47,14 +48,56 @@ def setup_default_logging():
 setup_default_logging()
 logger = logging.getLogger(__name__)
 
+def load_config():
+    """Load configuration from pyproject.toml or config/nanochat.toml if they exist."""
+    import toml
+
+    # Try to load from pyproject.toml first
+    pyproject_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "pyproject.toml")
+    if os.path.exists(pyproject_path):
+        try:
+            with open(pyproject_path, 'r') as f:
+                pyproject_config = toml.load(f)
+            nanochat_config = pyproject_config.get("tool", {}).get("nanochat", {})
+            if nanochat_config:
+                return {"paths": nanochat_config}
+        except Exception as e:
+            logger.warning(f"Failed to load pyproject.toml config: {e}")
+
+    # Fallback to config/nanochat.toml
+    config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config", "nanochat.toml")
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, 'r') as f:
+                return toml.load(f)
+        except Exception as e:
+            logger.warning(f"Failed to load config file {config_path}: {e}")
+
+    # Fallback to old json format for backward compatibility
+    config_json_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config", "nanochat.json")
+    if os.path.exists(config_json_path):
+        try:
+            with open(config_json_path, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            logger.warning(f"Failed to load config file {config_json_path}: {e}")
+
+    return {}
+
 def get_base_dir():
-    # co-locate nanochat intermediates with other cached data in ~/.cache (by default)
+    # Priority order: environment variable > config file > default
     if os.environ.get("NANOCHAT_BASE_DIR"):
         nanochat_dir = os.environ.get("NANOCHAT_BASE_DIR")
     else:
-        home_dir = os.path.expanduser("~")
-        cache_dir = os.path.join(home_dir, ".cache")
-        nanochat_dir = os.path.join(cache_dir, "nanochat")
+        config = load_config()
+        config_base_dir = config.get("paths", {}).get("nanochat_base_dir")
+        if config_base_dir:
+            nanochat_dir = os.path.expanduser(config_base_dir)
+        else:
+            # default: co-locate nanochat intermediates with other cached data in ~/.cache
+            home_dir = os.path.expanduser("~")
+            cache_dir = os.path.join(home_dir, ".cache")
+            nanochat_dir = os.path.join(cache_dir, "nanochat")
     os.makedirs(nanochat_dir, exist_ok=True)
     return nanochat_dir
 
