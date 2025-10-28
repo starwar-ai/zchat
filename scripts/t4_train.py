@@ -24,8 +24,27 @@ from nanochat.tokenizer import get_tokenizer, get_token_bytes
 from nanochat.checkpoint_manager import save_checkpoint
 from nanochat.loss_eval import evaluate_bpb
 from nanochat.engine import Engine
+from nanochat.data_checker import check_base_training_data
 from scripts.base_eval import evaluate_model
 print_banner()
+
+# 数据完整性检查
+print0("\n" + "="*60)
+print0("检查训练数据完整性...")
+print0("="*60)
+data_ok, missing = check_base_training_data()
+if not data_ok:
+    print0("✗ 数据完整性检查失败！")
+    print0("\n缺失的数据:")
+    for item in missing:
+        print0(f"  - {item}")
+    print0("\n请先运行以下命令下载数据:")
+    print0("  python -m scripts.prepare_data --data-dir ./data")
+    print0("="*60 + "\n")
+    import sys
+    sys.exit(1)
+print0("✓ 数据完整性检查通过")
+print0("="*60 + "\n")
 
 # -----------------------------------------------------------------------------
 # T4 GPU优化配置

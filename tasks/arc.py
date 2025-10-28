@@ -14,14 +14,17 @@ class ARC(Task):
         assert subset in ["ARC-Easy", "ARC-Challenge"], "ARC subset must be ARC-Easy or ARC-Challenge"
         assert split in ["train", "validation", "test"], "ARC split must be train|validation|test"
 
-        if data_dir is not None:
-            # Load from local parquet file
-            data_path = Path(data_dir) / "arc" / f"{subset}_{split}.parquet"
-            if not data_path.exists():
-                raise FileNotFoundError(f"Local dataset not found: {data_path}. Please run scripts/download_datasets.py first.")
+        # 默认使用 ./data 目录
+        if data_dir is None:
+            data_dir = "./data"
+
+        # 尝试从本地 parquet 文件加载
+        data_path = Path(data_dir) / "arc" / f"{subset}_{split}.parquet"
+        if data_path.exists():
             self.ds = Dataset.from_parquet(str(data_path))
         else:
-            # Load from HuggingFace
+            # 回退到从 HuggingFace 加载
+            print(f"Warning: Local dataset not found at {data_path}, loading from HuggingFace...")
             self.ds = load_dataset("allenai/ai2_arc", name=subset, split=split)
 
         self.ds = self.ds.shuffle(seed=42)

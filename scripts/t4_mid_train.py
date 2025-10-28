@@ -21,6 +21,7 @@ from nanochat.tokenizer import get_token_bytes
 from nanochat.checkpoint_manager import save_checkpoint
 from nanochat.loss_eval import evaluate_bpb
 from nanochat.checkpoint_manager import load_model
+from nanochat.data_checker import check_mid_training_data
 import torch.distributed as dist
 
 from tasks.common import TaskMixture
@@ -29,6 +30,24 @@ from tasks.mmlu import MMLU
 from tasks.smoltalk import SmolTalk
 from tasks.customjson import CustomJSON
 from tasks.spellingbee import SimpleSpelling, SpellingBee
+
+# 数据完整性检查
+print("\n" + "="*60)
+print("检查中期训练数据完整性...")
+print("="*60)
+data_ok, missing = check_mid_training_data()
+if not data_ok:
+    print("✗ 数据完整性检查失败！")
+    print("\n缺失的数据:")
+    for item in missing:
+        print(f"  - {item}")
+    print("\n请先运行以下命令下载数据:")
+    print("  python -m scripts.prepare_data --data-dir ./data")
+    print("="*60 + "\n")
+    import sys
+    sys.exit(1)
+print("✓ 数据完整性检查通过")
+print("="*60 + "\n")
 
 # -----------------------------------------------------------------------------
 # T4 GPU优化配置
@@ -101,8 +120,12 @@ for opt in optimizers:
         group["initial_lr"] = group["lr"] # save the initial learning so we can decay easily later
 
 # Midtraining data mixture and DataLoader
-base_dir = get_base_dir()
-identity_conversations_filepath = os.path.join(base_dir, "identity_conversations.jsonl")
+# 优先使用 ./data/identity_conversations.jsonl，如果不存在则使用 .cache/nanochat/identity_conversations.jsonl
+if os.path.exists("./data/identity_conversations.jsonl"):
+    identity_conversations_filepath = "./data/identity_conversations.jsonl"
+else:
+    base_dir = get_base_dir()
+    identity_conversations_filepath = os.path.join(base_dir, "identity_conversations.jsonl")
 train_dataset = TaskMixture([
     SmolTalk(split="train"), # 460K rows of general conversations
     MMLU(subset="auxiliary_train", split="train"), # 100K rows of multiple choice problems drawn from ARC, MC_TEST, OBQA, RACE

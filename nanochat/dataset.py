@@ -23,8 +23,13 @@ from nanochat.common import get_base_dir
 BASE_URL = "https://www.modelscope.cn/datasets/Thackeray/karpathy-fineweb-edu-100b-shuffle-240shard/resolve/master"
 MAX_SHARD = 1822 # the last datashard is shard_01822.parquet
 index_to_filename = lambda index: f"shard_{index:05d}.parquet" # format of the filenames
-base_dir = get_base_dir()
-DATA_DIR = os.path.join(base_dir, "base_data")
+
+# 优先使用 ./data/base_data，如果不存在则使用 .cache/nanochat/base_data
+if os.path.exists("./data/base_data"):
+    DATA_DIR = "./data/base_data"
+else:
+    base_dir = get_base_dir()
+    DATA_DIR = os.path.join(base_dir, "base_data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # -----------------------------------------------------------------------------
