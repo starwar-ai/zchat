@@ -20,8 +20,11 @@ DATASETS = [
     {
         "name": "mmlu",
         "repo": "cais/mmlu",
-        "configs": ["all", "auxiliary_train"],
-        "splits": ["train", "validation", "dev", "test"],
+        # Different configs have different available splits
+        "config_splits": {
+            "all": ["validation", "dev", "test"],
+            "auxiliary_train": ["train"]
+        },
         "local_name": "mmlu"
     },
     {
@@ -58,11 +61,18 @@ def download_dataset(dataset_config, data_dir, force=False):
     dataset_dir = Path(data_dir) / local_name
     dataset_dir.mkdir(parents=True, exist_ok=True)
 
-    configs = dataset_config.get("configs", [None])
-    splits = dataset_config["splits"]
+    # Support both old format (configs + splits) and new format (config_splits)
+    if "config_splits" in dataset_config:
+        # New format: each config has its own list of splits
+        config_splits_map = dataset_config["config_splits"]
+        config_split_pairs = [(config, split) for config, splits in config_splits_map.items() for split in splits]
+    else:
+        # Old format: all configs have the same splits
+        configs = dataset_config.get("configs", [None])
+        splits = dataset_config["splits"]
+        config_split_pairs = [(config, split) for config in configs for split in splits]
 
-    for config in configs:
-        for split in splits:
+    for config, split in config_split_pairs:
             try:
                 # Determine local file path
                 if config:

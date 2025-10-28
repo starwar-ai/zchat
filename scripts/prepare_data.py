@@ -36,8 +36,11 @@ HUGGINGFACE_DATASETS = [
     {
         "name": "mmlu",
         "repo": "cais/mmlu",
-        "configs": ["all", "auxiliary_train"],
-        "splits": ["train", "validation", "dev", "test"],
+        # Different configs have different available splits
+        "config_splits": {
+            "all": ["validation", "dev", "test"],
+            "auxiliary_train": ["train"]
+        },
         "local_name": "mmlu"
     },
     {
@@ -187,13 +190,20 @@ def download_huggingface_dataset(dataset_config: dict, data_dir: Path, force: bo
     dataset_dir = data_dir / local_name
     dataset_dir.mkdir(parents=True, exist_ok=True)
 
-    configs = dataset_config.get("configs", [None])
-    splits = dataset_config["splits"]
+    # Support both old format (configs + splits) and new format (config_splits)
+    if "config_splits" in dataset_config:
+        # New format: each config has its own list of splits
+        config_splits_map = dataset_config["config_splits"]
+        config_split_pairs = [(config, split) for config, splits in config_splits_map.items() for split in splits]
+    else:
+        # Old format: all configs have the same splits
+        configs = dataset_config.get("configs", [None])
+        splits = dataset_config["splits"]
+        config_split_pairs = [(config, split) for config in configs for split in splits]
 
     all_success = True
 
-    for config in configs:
-        for split in splits:
+    for config, split in config_split_pairs:
             try:
                 # 确定本地文件路径
                 if config:
@@ -338,19 +348,24 @@ def check_data_integrity(data_dir: Path) -> Tuple[bool, List[str]]:
             missing_items.append(f"HF Dataset: {local_name}")
             continue
 
-        configs = dataset_config.get("configs", [None])
-        splits = dataset_config["splits"]
+        # Support both old format (configs + splits) and new format (config_splits)
+        if "config_splits" in dataset_config:
+            config_split_pairs = [(config, split) for config, splits in dataset_config["config_splits"].items() for split in splits]
+        else:
+            configs = dataset_config.get("configs", [None])
+            splits = dataset_config["splits"]
+            config_split_pairs = [(config, split) for config in configs for split in splits]
+
         missing_files = []
 
-        for config in configs:
-            for split in splits:
-                if config:
-                    file_name = f"{config}_{split}.parquet"
-                else:
-                    file_name = f"{split}.parquet"
+        for config, split in config_split_pairs:
+            if config:
+                file_name = f"{config}_{split}.parquet"
+            else:
+                file_name = f"{split}.parquet"
 
-                if not (dataset_dir / file_name).exists():
-                    missing_files.append(file_name)
+            if not (dataset_dir / file_name).exists():
+                missing_files.append(file_name)
 
         if missing_files:
             print(f"  ✗ {local_name}: 缺失 {len(missing_files)} 个文件")
