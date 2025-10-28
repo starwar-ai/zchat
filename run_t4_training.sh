@@ -10,7 +10,9 @@ echo "🚀 开始T4 GPU训练流程..."
 # 环境设置
 export OMP_NUM_THREADS=1
 export NANOCHAT_BASE_DIR=".cache/nanochat"
+export DATA_DIR="./data"
 mkdir -p $NANOCHAT_BASE_DIR
+mkdir -p $DATA_DIR
 
 # 检查并安装uv
 command -v uv &> /dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -30,29 +32,37 @@ echo "📊 Wandb运行名称: $WANDB_RUN"
 python -m nanochat.report reset
 
 # 安装Rust和编译tokenizer
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+echo "🔧 编译 Rust tokenizer..."
+if [ ! -d "$HOME/.cargo" ]; then
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+fi
 source "$HOME/.cargo/env"
 uv run maturin develop --release --manifest-path rustbpe/Cargo.toml
 
-# 下载评估数据
-EVAL_BUNDLE_URL=https://karpathy-public.s3.us-west-2.amazonaws.com/eval_bundle.zip
-if [ ! -d "$NANOCHAT_BASE_DIR/eval_bundle" ]; then
-    echo "📥 下载评估数据包..."
-    curl -L -o eval_bundle.zip $EVAL_BUNDLE_URL
-    unzip -q eval_bundle.zip
-    rm eval_bundle.zip
-    mv eval_bundle $NANOCHAT_BASE_DIR
+echo "📊 开始数据准备..."
+echo "=================================================="
+
+# 步骤1: 下载并验证所有数据
+echo "📥 下载训练和评估数据..."
+python -m scripts.prepare_data --data-dir $DATA_DIR --num-base-shards 100 --num-workers 4
+
+# 步骤2: 验证数据完整性
+echo ""
+echo "🔍 验证数据完整性..."
+python -m nanochat.data_checker
+if [ $? -ne 0 ]; then
+    echo "❌ 数据完整性检查失败！请检查数据下载。"
+    exit 1
 fi
 
-# 下载身份对话数据
-curl -L -o $NANOCHAT_BASE_DIR/identity_conversations.jsonl https://karpathy-public.s3.us-west-2.amazonaws.com/identity_conversations.jsonl
+echo ""
+echo "✅ 数据准备完成！"
+echo "=================================================="
+echo ""
 
-echo "📊 开始数据准备..."
-
-# 训练tokenizer - 使用较少的数据以适应T4
+# 训练tokenizer
 echo "🔤 训练tokenizer..."
-python -m nanochat.dataset -n 8  # 减少数据量
-python -m scripts.tok_train --max_chars=2000000000  # 减少字符数
+python -m scripts.tok_train --max_chars=2000000000  # 减少字符数以适应T4
 python -m scripts.tok_eval
 
 echo "🏋️ 开始基础模型训练..."

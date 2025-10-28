@@ -21,6 +21,7 @@ from nanochat.common import compute_init, compute_cleanup, get_base_dir, print0,
 from nanochat.checkpoint_manager import load_model
 from nanochat.checkpoint_manager import save_checkpoint
 from nanochat.engine import Engine
+from nanochat.data_checker import check_sft_training_data
 from scripts.chat_eval import run_chat_eval
 
 from tasks.common import TaskMixture
@@ -29,6 +30,24 @@ from tasks.gsm8k import GSM8K
 from tasks.smoltalk import SmolTalk
 from tasks.customjson import CustomJSON
 from tasks.spellingbee import SimpleSpelling, SpellingBee
+
+# 数据完整性检查
+print("\n" + "="*60)
+print("检查 SFT 训练数据完整性...")
+print("="*60)
+data_ok, missing = check_sft_training_data()
+if not data_ok:
+    print("✗ 数据完整性检查失败！")
+    print("\n缺失的数据:")
+    for item in missing:
+        print(f"  - {item}")
+    print("\n请先运行以下命令下载数据:")
+    print("  python -m scripts.prepare_data --data-dir ./data")
+    print("="*60 + "\n")
+    import sys
+    sys.exit(1)
+print("✓ 数据完整性检查通过")
+print("="*60 + "\n")
 
 # -----------------------------------------------------------------------------
 # T4 GPU优化的SFT配置
@@ -90,7 +109,11 @@ print0(f"  DDP world size: {ddp_world_size}")
 
 # -----------------------------------------------------------------------------
 # Task data mixture we'll train on
-identity_conversations_filepath = os.path.join(get_base_dir(), "identity_conversations.jsonl")
+# 优先使用 ./data/identity_conversations.jsonl，如果不存在则使用 .cache/nanochat/identity_conversations.jsonl
+if os.path.exists("./data/identity_conversations.jsonl"):
+    identity_conversations_filepath = "./data/identity_conversations.jsonl"
+else:
+    identity_conversations_filepath = os.path.join(get_base_dir(), "identity_conversations.jsonl")
 train_ds = TaskMixture([
     ARC(subset="ARC-Easy", split="train"), # 2.3K rows
     ARC(subset="ARC-Challenge", split="train"), # 1.1K rows

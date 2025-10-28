@@ -42,14 +42,17 @@ class GSM8K(Task):
         assert subset in ["main", "socratic"], "GSM8K subset must be main|socratic"
         assert split in ["train", "test"], "GSM8K split must be train|test"
 
-        if data_dir is not None:
-            # Load from local parquet file
-            data_path = Path(data_dir) / "gsm8k" / f"{subset}_{split}.parquet"
-            if not data_path.exists():
-                raise FileNotFoundError(f"Local dataset not found: {data_path}. Please run scripts/download_datasets.py first.")
+        # 默认使用 ./data 目录
+        if data_dir is None:
+            data_dir = "./data"
+
+        # 尝试从本地 parquet 文件加载
+        data_path = Path(data_dir) / "gsm8k" / f"{subset}_{split}.parquet"
+        if data_path.exists():
             self.ds = Dataset.from_parquet(str(data_path))
         else:
-            # Load from HuggingFace
+            # 回退到从 HuggingFace 加载
+            print(f"Warning: Local dataset not found at {data_path}, loading from HuggingFace...")
             self.ds = load_dataset("openai/gsm8k", name=subset, split=split)
 
         self.ds = self.ds.shuffle(seed=42)

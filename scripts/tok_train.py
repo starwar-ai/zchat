@@ -3,12 +3,31 @@ Train a tokenizer using the HuggingFace Tokenizers library.
 In the style of GPT-4 tokenizer.
 """
 import os
+import sys
 import time
 import argparse
 import torch
 from nanochat.tokenizer import RustBPETokenizer
 from nanochat.common import get_base_dir
 from nanochat.dataset import parquets_iter_batched
+from nanochat.data_checker import check_tokenizer_data
+
+# 数据完整性检查
+print("\n" + "="*60)
+print("检查 tokenizer 训练数据完整性...")
+print("="*60)
+data_ok, missing = check_tokenizer_data()
+if not data_ok:
+    print("✗ 数据完整性检查失败！")
+    print("\n缺失的数据:")
+    for item in missing:
+        print(f"  - {item}")
+    print("\n请先运行以下命令下载数据:")
+    print("  python -m scripts.prepare_data --data-dir ./data --num-base-shards 10")
+    print("="*60 + "\n")
+    sys.exit(1)
+print("✓ 数据完整性检查通过")
+print("="*60 + "\n")
 
 # -----------------------------------------------------------------------------
 # Parse command line arguments

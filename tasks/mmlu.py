@@ -22,17 +22,20 @@ class MMLU(Task):
         self.subset = subset
         self.split = split
 
-        if data_dir is not None:
-            # Load from local parquet file
-            data_path = Path(data_dir) / "mmlu" / f"{subset}_{split}.parquet"
-            if not data_path.exists():
-                raise FileNotFoundError(f"Local dataset not found: {data_path}. Please run scripts/download_datasets.py first.")
+        # 默认使用 ./data 目录
+        if data_dir is None:
+            data_dir = "./data"
+
+        # 尝试从本地 parquet 文件加载
+        data_path = Path(data_dir) / "mmlu" / f"{subset}_{split}.parquet"
+        if data_path.exists():
             self.ds = Dataset.from_parquet(str(data_path))
             if subset == "auxiliary_train":
                 # I don't understand why but the auxiliary_train rows have some weird additional 'train' wrapper
                 self.ds = self.ds.map(lambda row: row['train'], remove_columns=['train'])
         else:
-            # Load from HuggingFace
+            # 回退到从 HuggingFace 加载
+            print(f"Warning: Local dataset not found at {data_path}, loading from HuggingFace...")
             self.ds = load_dataset("cais/mmlu", name=subset, split=split)
             if subset == "auxiliary_train":
                 # I don't understand why but the auxiliary_train rows have some weird additional 'train' wrapper
