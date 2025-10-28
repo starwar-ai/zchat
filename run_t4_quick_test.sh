@@ -71,7 +71,7 @@ echo "📊 开始数据准备..."
 echo "🔤 训练tokenizer..."
 python -m nanochat.dataset -n 2  # 最少数据量
 python -m scripts.tok_train --max_chars=100000000  # 最少字符数
-python -m scripts.tok_eval
+# python -m scripts.tok_eval
 
 echo "🏋️ 开始基础模型训练 (快速测试)..."
 
@@ -79,11 +79,11 @@ echo "🏋️ 开始基础模型训练 (快速测试)..."
 echo "📈 运行基础训练 (深度8, 批次大小2, 100步)..."
 torchrun --standalone --nproc_per_node=4 -m scripts.t4_train -- --run=$WANDB_RUN --depth=8 --device_batch_size=2 --num_iterations=100
 
-echo "📊 运行基础损失评估..."
-torchrun --standalone --nproc_per_node=4 -m scripts.base_loss
+# echo "📊 运行基础损失评估..."
+# torchrun --standalone --nproc_per_node=4 -m scripts.base_loss
 
-echo "📊 运行基础模型评估..."
-torchrun --standalone --nproc_per_node=4 -m scripts.base_eval
+# echo "📊 运行基础模型评估..."
+# torchrun --standalone --nproc_per_node=4 -m scripts.base_eval
 
 echo "🎯 开始中期训练 (快速测试)..."
 
@@ -91,8 +91,8 @@ echo "🎯 开始中期训练 (快速测试)..."
 echo "📈 运行中期训练 (批次大小1, 50步)..."
 torchrun --standalone --nproc_per_node=4 -m scripts.t4_mid_train -- --run=$WANDB_RUN --device_batch_size=1 --num_iterations=50
 
-echo "📊 运行中期训练评估..."
-torchrun --standalone --nproc_per_node=4 -m scripts.chat_eval -- -i mid
+# echo "📊 运行中期训练评估..."
+# torchrun --standalone --nproc_per_node=4 -m scripts.chat_eval -- -i mid
 
 echo "💬 开始SFT训练 (快速测试)..."
 
@@ -100,11 +100,11 @@ echo "💬 开始SFT训练 (快速测试)..."
 echo "📈 运行SFT训练 (批次大小1, 20步)..."
 torchrun --standalone --nproc_per_node=4 -m scripts.t4_chat_sft -- --run=$WANDB_RUN --device_batch_size=1 --num_iterations=20
 
-echo "📊 运行SFT评估..."
-torchrun --standalone --nproc_per_node=4 -m scripts.chat_eval -- -i sft
+# echo "📊 运行SFT评估..."
+# torchrun --standalone --nproc_per_node=4 -m scripts.chat_eval -- -i sft
 
-echo "📋 生成最终报告..."
-python -m nanochat.report generate
+# echo "📋 生成最终报告..."
+# python -m nanochat.report generate
 
 echo "🎉 T4快速测试完成！"
 echo "📊 查看报告: python -m nanochat.report show"
